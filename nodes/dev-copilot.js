@@ -1316,7 +1316,7 @@ module.exports = function (RED) {
     ) {
       if (
         !node.openaiClient.responses ||
-        typeof node.openaiClient.responses.stream !== "function"
+        typeof node.openaiClient.responses.create !== "function"
       ) {
         throw new Error(
           "OpenAI SDK does not support Responses API streaming. Please install openai >= 4.87.0."
@@ -1338,11 +1338,14 @@ module.exports = function (RED) {
       let round = 0;
 
       for (round = 0; round < maxRounds; round++) {
-        const stream = node.openaiClient.responses.stream(
+        const stream = await node.openaiClient.responses.create(
           node.buildResponsesRequestParams(input, tools, true)
         );
 
         let currentRoundText = "";
+        let completedResponse = null;
+        const outputItems = [];
+        const functionArgumentsByIndex = new Map();
 
         for await (const event of stream) {
           if (event.type === "response.output_text.delta" && event.delta) {
@@ -1357,6 +1360,54 @@ module.exports = function (RED) {
             }
           }
 
+          if (event.type === "response.output_text.done" && event.text) {
+            currentRoundText = currentRoundText || event.text;
+          }
+
+          if (event.type === "response.output_item.added" && event.item) {
+            outputItems[event.output_index] = event.item;
+            if (
+              event.item.type === "function_call" &&
+              functionArgumentsByIndex.has(event.output_index)
+            ) {
+              event.item.arguments = functionArgumentsByIndex.get(event.output_index);
+            }
+          }
+
+          if (event.type === "response.output_item.done" && event.item) {
+            outputItems[event.output_index] = event.item;
+            if (
+              event.item.type === "function_call" &&
+              functionArgumentsByIndex.has(event.output_index)
+            ) {
+              event.item.arguments = functionArgumentsByIndex.get(event.output_index);
+            }
+          }
+
+          if (event.type === "response.function_call_arguments.delta") {
+            const currentArgs = functionArgumentsByIndex.get(event.output_index) || "";
+            const nextArgs = `${currentArgs}${event.delta || ""}`;
+            functionArgumentsByIndex.set(event.output_index, nextArgs);
+
+            const existing = outputItems[event.output_index];
+            if (existing && existing.type === "function_call") {
+              existing.arguments = nextArgs;
+            }
+          }
+
+          if (event.type === "response.function_call_arguments.done") {
+            functionArgumentsByIndex.set(event.output_index, event.arguments || "");
+
+            const existing = outputItems[event.output_index];
+            if (existing && existing.type === "function_call") {
+              existing.arguments = event.arguments || existing.arguments || "";
+            }
+          }
+
+          if (event.type === "response.completed" && event.response) {
+            completedResponse = event.response;
+          }
+
           if (event.type === "error") {
             throw new Error(event.message || "Responses API streaming error");
           }
@@ -1367,7 +1418,23 @@ module.exports = function (RED) {
           }
         }
 
-        lastResponse = await stream.finalResponse();
+        lastResponse = completedResponse || {
+          output: outputItems.filter(Boolean),
+          output_text: currentRoundText,
+          usage: null,
+        };
+
+        const streamedOutput = outputItems.filter(Boolean);
+        if (
+          (!Array.isArray(lastResponse.output) || lastResponse.output.length === 0) &&
+          streamedOutput.length > 0
+        ) {
+          lastResponse.output = streamedOutput;
+        }
+
+        if (!lastResponse.output_text && currentRoundText) {
+          lastResponse.output_text = currentRoundText;
+        }
 
         if (Array.isArray(lastResponse.output)) {
           input.push(...lastResponse.output);
