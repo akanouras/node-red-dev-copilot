@@ -43,7 +43,7 @@ Simple configuration to get started, supporting multiple mainstream AI services:
 
 - **AI Services**: Supports OpenAI, Google Gemini, DeepSeek
 - **Secure Storage**: API keys stored securely via Node-RED's credential system
-- **Parameter Tuning**: Adjustable temperature, max tokens, and other parameters
+- **Parameter Tuning**: Optional temperature, max tokens, and other parameters
 - **MCP Integration**: default node-red mcp
 
 ## Quick Start

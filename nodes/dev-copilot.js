@@ -25,7 +25,10 @@ module.exports = function (RED) {
     node.provider = config.provider || "openai";
     node.model = config.model || "gpt-4.1";
     node.customUrl = config.customUrl || "";
-    node.temperature = parseFloat(config.temperature) || 0.1;
+    const configuredTemperature = parseFloat(config.temperature);
+    node.temperature = Number.isFinite(configuredTemperature)
+      ? configuredTemperature
+      : undefined;
     node.maxTokens = parseInt(config.maxTokens) || 2000;
     node.toolCallLimit = parseInt(config.toolCallLimit) || 10;
     node.mcpCommand = config.mcpCommand || "";
@@ -101,6 +104,15 @@ module.exports = function (RED) {
         }
       }
       return functionCalls;
+    };
+
+    // Some newer models reject the temperature parameter entirely. Only send it
+    // when the node has an explicit numeric value configured.
+    node.addOptionalTemperature = function (params) {
+      if (Number.isFinite(node.temperature)) {
+        params.temperature = node.temperature;
+      }
+      return params;
     };
 
     // Initialize LLM SDK clients
@@ -509,12 +521,11 @@ module.exports = function (RED) {
       const maxRounds = node.toolCallLimit || 10;
 
       for (let round = 0; round < maxRounds; round++) {
-        const requestParams = {
+        const requestParams = node.addOptionalTemperature({
           model: node.model,
           messages: conversationMessages,
-          temperature: node.temperature || 0.1,
           max_tokens: node.maxTokens || 2000,
-        };
+        });
 
         // If tools are available, add them to the request with automatic function calling
         if (tools && tools.length > 0) {
@@ -637,13 +648,12 @@ module.exports = function (RED) {
           const response = await node.googleClient.models.generateContent({
             model: node.model,
             contents: contents,
-            config: {
-              temperature: node.temperature || 0.1,
+            config: node.addOptionalTemperature({
               maxOutputTokens: node.maxTokens || 2000,
               systemInstruction: systemInstruction
                 ? systemInstruction.content
                 : undefined,
-            },
+            }),
           });
 
           // Robust text extraction for models that may not set response.text
@@ -677,14 +687,13 @@ module.exports = function (RED) {
       for (let round = 0; round < maxRounds; round++) {
         try {
           // Use the latest Gen AI SDK config format
-          const config = {
+          const config = node.addOptionalTemperature({
             tools: [{ functionDeclarations: functionDeclarations }],
-            temperature: node.temperature || 0.1,
             maxOutputTokens: node.maxTokens || 2000,
             systemInstruction: systemInstruction
               ? systemInstruction.content
               : undefined,
-          };
+          });
 
           const response = await node.googleClient.models.generateContent({
             model: node.model,
@@ -814,13 +823,12 @@ module.exports = function (RED) {
                   {
                     model: node.model,
                     contents: contents,
-                    config: {
-                      temperature: node.temperature || 0.1,
+                    config: node.addOptionalTemperature({
                       maxOutputTokens: node.maxTokens || 2000,
                       systemInstruction: systemInstruction
                         ? systemInstruction.content
                         : undefined,
-                    },
+                    }),
                   }
                 );
 
@@ -903,13 +911,12 @@ module.exports = function (RED) {
       let hitLimit = false;
 
       for (round = 0; round < maxRounds; round++) {
-        const requestParams = {
+        const requestParams = node.addOptionalTemperature({
           model: node.model,
           messages: conversationMessages,
-          temperature: node.temperature || 0.1,
           max_tokens: node.maxTokens || 2000,
           stream: true, // Enable streaming
-        };
+        });
 
         // If tools are available, add them to the request with automatic function calling
         if (tools && tools.length > 0) {
@@ -1161,13 +1168,12 @@ module.exports = function (RED) {
           const request = {
             model: node.model,
             contents: contents,
-            config: {
-              temperature: node.temperature || 0.1,
+            config: node.addOptionalTemperature({
               maxOutputTokens: node.maxTokens || 2000,
               systemInstruction: systemInstruction
                 ? systemInstruction.content
                 : undefined,
-            },
+            }),
           };
 
           const streamingResponse =
@@ -1266,14 +1272,13 @@ module.exports = function (RED) {
                 await node.googleClient.models.generateContent({
                   model: node.model,
                   contents: contents,
-                  config: {
+                  config: node.addOptionalTemperature({
                     tools: [{ functionDeclarations: functionDeclarations }],
-                    temperature: node.temperature || 0.1,
                     maxOutputTokens: node.maxTokens || 2000,
                     systemInstruction: systemInstruction
                       ? systemInstruction.content
                       : undefined,
-                  },
+                  }),
                 });
 
               // Extract text from non-stream response
@@ -1351,14 +1356,13 @@ module.exports = function (RED) {
       for (round = 0; round < maxRounds; round++) {
         try {
           // Use the latest Gen AI SDK config format for streaming with tools
-          const config = {
+          const config = node.addOptionalTemperature({
             tools: [{ functionDeclarations: functionDeclarations }],
-            temperature: node.temperature || 0.1,
             maxOutputTokens: node.maxTokens || 2000,
             systemInstruction: systemInstruction
               ? systemInstruction.content
               : undefined,
-          };
+          });
 
           const streamingResponse =
             await node.googleClient.models.generateContentStream({
