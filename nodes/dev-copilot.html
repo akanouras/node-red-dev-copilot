@@ -812,11 +812,17 @@
         try {
           // Use fetch API for streaming SSE
           const apiPrefix = getApiPrefix();
+          const headers = {
+            "Content-Type": "application/json",
+          };
+          const authTokens = RED.settings && RED.settings.get("auth-tokens");
+          if (authTokens && authTokens.access_token) {
+            headers.Authorization = `Bearer ${authTokens.access_token}`;
+          }
+
           const response = await fetch(`${apiPrefix}/chat-stream`, {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
+            headers: headers,
             body: JSON.stringify({
               message: message,
               nodeId: currentNodeId,

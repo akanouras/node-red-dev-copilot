@@ -1926,7 +1926,7 @@ module.exports = function (RED) {
   });
 
   // API endpoint: send message to copilot with streaming
-  RED.httpAdmin.post(`${API_PREFIX}/chat-stream`, async function (req, res) {
+  RED.httpAdmin.post(`${API_PREFIX}/chat-stream`, needsPermission("flows.write"), async function (req, res) {
     try {
       const { message, nodeId } = req.body;
 
