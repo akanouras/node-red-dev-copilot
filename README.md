@@ -111,6 +111,8 @@ Main configuration options:
 - Model: Model name (e.g., gpt-4, gemini-2.5-pro, deepseek-chat)
 - API Key: Corresponding service API key
 - Custom URL: For custom OpenAI-compatible APIs (required when provider is "custom")
+- Responses API: Use OpenAI's Responses API for OpenAI or compatible custom endpoints (required for GPT-5.1+ OpenAI models)
+- Store: When Responses API is enabled, send `store: true` with model requests
 - Temperature: Randomness control (0-2, recommended 0.1-0.3 for programming)
 - Max Tokens: Maximum response length (recommended 2000-4000)
 - Tool Call Limit: Tool call round limit (recommended 10-15)
@@ -133,6 +135,9 @@ API Key: sk-xxx...
 Temperature: 0.1
 Max Tokens: 2000
 ```
+
+For GPT-5.1+ models, enable **Responses API**. Enable **Store** only if you want
+requests to include `store: true`.
 
 **Google Gemini Configuration**
 
@@ -161,6 +166,7 @@ Provider: custom
 Model: your-model-name
 API Key: your-api-key
 Custom URL: https://your-api-endpoint.com/v1
+Responses API: Enable if the endpoint supports /responses
 Temperature: 0.1
 Max Tokens: 2000
 ```

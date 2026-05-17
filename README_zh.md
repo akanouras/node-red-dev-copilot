@@ -110,6 +110,8 @@ contextStorage: {
 - Model: 模型名称 (如 gpt-4, gemini-2.5-pro, deepseek-chat)
 - API Key: 对应服务的 API 密钥
 - Custom URL: 自定义 OpenAI 兼容 API 的端点地址 (当 provider 为 "custom" 时必需)
+- Responses API: 对 OpenAI 或兼容的自定义端点使用 Responses API（GPT-5.1+ OpenAI 模型必需）
+- Store: 启用 Responses API 时，在模型请求中发送 `store: true`
 - Temperature: 随机性控制 (0-2, 编程建议用 0.1-0.3)
 - Max Tokens: 最大回复长度 (建议 2000-4000)
 - Tool Call Limit: 工具调用轮数限制 (建议 10-15)
@@ -132,6 +134,9 @@ API Key: sk-xxx...
 Temperature: 0.1
 Max Tokens: 2000
 ```
+
+使用 GPT-5.1+ 模型时，请启用 **Responses API**。仅在需要请求包含
+`store: true` 时启用 **Store**。
 
 **Google Gemini 配置**
 
@@ -160,6 +165,7 @@ Provider: custom
 Model: your-model-name
 API Key: your-api-key
 Custom URL: https://your-api-endpoint.com/v1
+Responses API: 如果端点支持 /responses，则启用
 Temperature: 0.1
 Max Tokens: 2000
 ```

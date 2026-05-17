@@ -10,6 +10,8 @@
       provider: { value: "openai", required: true },
       model: { value: "gpt-4.1", required: true },
       customUrl: { value: "" },
+      useResponsesApi: { value: false },
+      storeResponses: { value: false },
       temperature: {
         value: "",
         required: false,
@@ -68,11 +70,17 @@
           modelInput.attr("placeholder", "e.g., llama3-8b-instruct");
         }
 
-        // Show/hide custom URL field
+        // Show/hide custom URL and Responses API fields
         if (provider === "custom") {
           $("#custom-url-row").show();
         } else {
           $("#custom-url-row").hide();
+        }
+
+        if (provider === "openai" || provider === "custom") {
+          $("#responses-api-row, #store-responses-row").show();
+        } else {
+          $("#responses-api-row, #store-responses-row").hide();
         }
       }
 
@@ -152,6 +160,37 @@
     <div class="form-tips">
       Enter the model name you want to use. Recommended models will be shown
       based on the Provider.
+    </div>
+  </div>
+
+  <div class="form-row" id="responses-api-row">
+    <label for="node-input-useResponsesApi"
+      ><i class="fa fa-exchange"></i> Responses API</label
+    >
+    <input
+      type="checkbox"
+      id="node-input-useResponsesApi"
+      style="display: inline-block; width: auto; vertical-align: top;"
+    />
+    <span>Use OpenAI Responses API</span>
+    <div class="form-tips">
+      Enable for GPT-5.1+ OpenAI models or custom endpoints that implement the
+      Responses API.
+    </div>
+  </div>
+
+  <div class="form-row" id="store-responses-row">
+    <label for="node-input-storeResponses"
+      ><i class="fa fa-save"></i> Store</label
+    >
+    <input
+      type="checkbox"
+      id="node-input-storeResponses"
+      style="display: inline-block; width: auto; vertical-align: top;"
+    />
+    <span>Send <code>store: true</code></span>
+    <div class="form-tips">
+      Applies when the Responses API option is enabled.
     </div>
   </div>
 
@@ -290,6 +329,18 @@
     <dd>
       API endpoint URL for custom OpenAI-compatible providers (required when
       provider is "custom")
+    </dd>
+
+    <dt>Responses API <span class="property-type">boolean</span></dt>
+    <dd>
+      Use the OpenAI Responses API for OpenAI or Custom providers. Required for
+      GPT-5.1+ OpenAI models and custom endpoints that expose `/responses`.
+    </dd>
+
+    <dt>Store <span class="property-type">boolean</span></dt>
+    <dd>
+      When Responses API is enabled, include <code>store: true</code> in model
+      requests.
     </dd>
 
     <dt>Temperature <span class="property-type">number</span></dt>

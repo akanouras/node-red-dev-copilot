@@ -25,6 +25,10 @@ module.exports = function (RED) {
     node.provider = config.provider || "openai";
     node.model = config.model || "gpt-4.1";
     node.customUrl = config.customUrl || "";
+    node.useResponsesApi =
+      config.useResponsesApi === true || config.useResponsesApi === "true";
+    node.storeResponses =
+      config.storeResponses === true || config.storeResponses === "true";
     const configuredTemperature = parseFloat(config.temperature);
     node.temperature = Number.isFinite(configuredTemperature)
       ? configuredTemperature
@@ -113,6 +117,11 @@ module.exports = function (RED) {
         params.temperature = node.temperature;
       }
       return params;
+    };
+
+    node.shouldUseResponsesApi = function () {
+      const provider = node.provider.toLowerCase();
+      return node.useResponsesApi && (provider === "openai" || provider === "custom");
     };
 
     // Initialize LLM SDK clients
@@ -407,6 +416,75 @@ module.exports = function (RED) {
       }
     };
 
+    node.convertMessagesToResponsesInput = function (messages) {
+      return messages
+        .filter((msg) => ["system", "developer", "user", "assistant"].includes(msg.role))
+        .map((msg) => ({
+          role: msg.role,
+          content: msg.content || "",
+        }));
+    };
+
+    node.convertToolsToResponsesFormat = function (tools) {
+      return (tools || []).map((tool) => ({
+        type: "function",
+        name: tool.function.name,
+        description: tool.function.description || "",
+        parameters: tool.function.parameters || {},
+        strict: false,
+      }));
+    };
+
+    node.getResponsesText = function (response) {
+      if (!response) {
+        return "";
+      }
+
+      if (typeof response.output_text === "string") {
+        return response.output_text;
+      }
+
+      if (!Array.isArray(response.output)) {
+        return "";
+      }
+
+      return response.output
+        .filter((item) => item.type === "message" && Array.isArray(item.content))
+        .flatMap((item) => item.content)
+        .filter((part) => part.type === "output_text" && part.text)
+        .map((part) => part.text)
+        .join("");
+    };
+
+    node.getResponsesFunctionCalls = function (response) {
+      if (!response || !Array.isArray(response.output)) {
+        return [];
+      }
+
+      return response.output.filter((item) => item.type === "function_call");
+    };
+
+    node.buildResponsesRequestParams = function (input, tools, stream = false) {
+      const requestParams = node.addOptionalTemperature({
+        model: node.model,
+        input: [...input],
+        max_output_tokens: node.maxTokens || 2000,
+        stream,
+      });
+
+      if (node.storeResponses) {
+        requestParams.store = true;
+      }
+
+      const responseTools = node.convertToolsToResponsesFormat(tools);
+      if (responseTools.length > 0) {
+        requestParams.tools = responseTools;
+        requestParams.tool_choice = "auto";
+      }
+
+      return requestParams;
+    };
+
     // Call LLM API (integrated with MCP tools)
     node.callLLM = async function (messages) {
       if (!node.apiKey) {
@@ -508,6 +586,10 @@ module.exports = function (RED) {
     node.callOpenAIWithTools = async function (messages, tools) {
       if (!node.openaiClient) {
         throw new Error("OpenAI client not initialized");
+      }
+
+      if (node.shouldUseResponsesApi()) {
+        return await node.callOpenAIResponsesWithTools(messages, tools);
       }
 
       // Embed tool history into message content for LLM visibility (full, no truncation)
@@ -625,6 +707,125 @@ module.exports = function (RED) {
         content: displayContent,
         usage: lastResponse ? lastResponse.usage : null,
         toolHistory: toolHistory, // Include tool history in response
+      };
+    };
+
+    // Responses API call for OpenAI and custom endpoints that implement /responses.
+    node.callOpenAIResponsesWithTools = async function (messages, tools) {
+      if (!node.openaiClient.responses || typeof node.openaiClient.responses.create !== "function") {
+        throw new Error(
+          "OpenAI SDK does not support the Responses API. Please install openai >= 4.87.0."
+        );
+      }
+
+      const providerName =
+        node.provider.toLowerCase() === "custom" ? "Custom Responses" : "OpenAI Responses";
+      let input = node.convertMessagesToResponsesInput(
+        node.embedToolHistory([...messages], providerName)
+      );
+
+      let finalContent = [];
+      let lastResponse = null;
+      let toolHistory = [];
+      const maxRounds = node.toolCallLimit || 10;
+      let round = 0;
+
+      for (round = 0; round < maxRounds; round++) {
+        const response = await node.openaiClient.responses.create(
+          node.buildResponsesRequestParams(input, tools, false)
+        );
+        lastResponse = response;
+
+        if (Array.isArray(response.output)) {
+          input.push(...response.output);
+        }
+
+        const functionCalls = node.getResponsesFunctionCalls(response);
+        if (functionCalls.length > 0) {
+          for (const functionCall of functionCalls) {
+            const toolName = functionCall.name;
+            let toolArgs;
+
+            try {
+              toolArgs = JSON.parse(functionCall.arguments || "{}");
+            } catch (error) {
+              toolArgs = {};
+            }
+
+            finalContent.push(`🔧 Calling tool: ${toolName}`);
+            console.log(`🔧 [Dev-Copilot] Tool Call (Responses): ${toolName}`, toolArgs);
+
+            try {
+              const toolResult = await node.executeMCPTool(toolName, toolArgs);
+              const formattedResult = node.formatToolResult(toolResult);
+
+              console.log(
+                `✅ [Dev-Copilot] Tool Result (Responses): ${toolName}`,
+                formattedResult
+              );
+
+              toolHistory.push({
+                name: toolName,
+                args: toolArgs,
+                result: formattedResult,
+              });
+
+              input.push({
+                type: "function_call_output",
+                call_id: functionCall.call_id,
+                output: formattedResult,
+              });
+            } catch (error) {
+              console.log(
+                `❌ [Dev-Copilot] Tool Error (Responses): ${toolName}`,
+                error.message
+              );
+
+              const errorMessage = `Error: ${error.message}`;
+              toolHistory.push({
+                name: toolName,
+                args: toolArgs,
+                result: errorMessage,
+              });
+
+              input.push({
+                type: "function_call_output",
+                call_id: functionCall.call_id,
+                output: errorMessage,
+              });
+
+              finalContent.push(`❌ Tool call failed: ${error.message}`);
+            }
+          }
+
+          continue;
+        }
+
+        finalContent.push(node.getResponsesText(response));
+        break;
+      }
+
+      if (round >= maxRounds) {
+        const limitMessage = `⚠️ Reached maximum tool calls (${maxRounds}), response may be incomplete`;
+        finalContent.push(limitMessage);
+        node.warn(limitMessage);
+      }
+
+      const toolCallsInfo = finalContent
+        .filter((line) => line.startsWith("🔧") || line.startsWith("❌"))
+        .join("\n\n");
+      const aiResponse = finalContent
+        .filter((line) => !line.startsWith("🔧") && !line.startsWith("❌"))
+        .join("\n\n");
+
+      const displayContent = toolCallsInfo
+        ? `${toolCallsInfo}\n\n${aiResponse}`
+        : aiResponse;
+
+      return {
+        content: displayContent || "No response generated",
+        usage: lastResponse ? lastResponse.usage : null,
+        toolHistory: toolHistory,
       };
     };
 
@@ -893,6 +1094,14 @@ module.exports = function (RED) {
         throw new Error("OpenAI client not initialized");
       }
 
+      if (node.shouldUseResponsesApi()) {
+        return await node.callOpenAIResponsesWithToolsStream(
+          messages,
+          tools,
+          streamCallback
+        );
+      }
+
       // Embed tool history into message content for LLM visibility (full, no truncation)
       let conversationMessages = node.embedToolHistory(
         [...messages],
@@ -1096,6 +1305,188 @@ module.exports = function (RED) {
         content: accumulatedContent,
         usage: lastResponse ? lastResponse.usage : null,
         toolHistory: toolHistory, // Include tool history in response
+      };
+    };
+
+    // Responses API call with streaming support.
+    node.callOpenAIResponsesWithToolsStream = async function (
+      messages,
+      tools,
+      streamCallback
+    ) {
+      if (
+        !node.openaiClient.responses ||
+        typeof node.openaiClient.responses.stream !== "function"
+      ) {
+        throw new Error(
+          "OpenAI SDK does not support Responses API streaming. Please install openai >= 4.87.0."
+        );
+      }
+
+      const providerName =
+        node.provider.toLowerCase() === "custom"
+          ? "Custom Responses Stream"
+          : "OpenAI Responses Stream";
+      let input = node.convertMessagesToResponsesInput(
+        node.embedToolHistory([...messages], providerName)
+      );
+
+      let accumulatedContent = "";
+      let lastResponse = null;
+      let toolHistory = [];
+      const maxRounds = node.toolCallLimit || 10;
+      let round = 0;
+
+      for (round = 0; round < maxRounds; round++) {
+        const stream = node.openaiClient.responses.stream(
+          node.buildResponsesRequestParams(input, tools, true)
+        );
+
+        let currentRoundText = "";
+
+        for await (const event of stream) {
+          if (event.type === "response.output_text.delta" && event.delta) {
+            currentRoundText += event.delta;
+            accumulatedContent += event.delta;
+
+            if (streamCallback) {
+              streamCallback({
+                type: "content",
+                content: event.delta,
+              });
+            }
+          }
+
+          if (event.type === "error") {
+            throw new Error(event.message || "Responses API streaming error");
+          }
+
+          if (event.type === "response.failed") {
+            const message = event.response?.error?.message || "Responses API request failed";
+            throw new Error(message);
+          }
+        }
+
+        lastResponse = await stream.finalResponse();
+
+        if (Array.isArray(lastResponse.output)) {
+          input.push(...lastResponse.output);
+        }
+
+        const functionCalls = node.getResponsesFunctionCalls(lastResponse);
+        if (functionCalls.length > 0) {
+          for (const functionCall of functionCalls) {
+            const toolName = functionCall.name;
+            let toolArgs;
+
+            try {
+              toolArgs = JSON.parse(functionCall.arguments || "{}");
+            } catch (error) {
+              toolArgs = {};
+            }
+
+            const toolMessage = `🔧 Calling tool: ${toolName}`;
+            console.log(
+              `🔧 [Dev-Copilot] Tool Call (Responses Stream): ${toolName}`,
+              toolArgs
+            );
+
+            if (streamCallback) {
+              streamCallback({
+                type: "tool",
+                content: toolMessage,
+              });
+            }
+
+            try {
+              const toolResult = await node.executeMCPTool(toolName, toolArgs);
+              const formattedResult = node.formatToolResult(toolResult);
+
+              console.log(
+                `✅ [Dev-Copilot] Tool Result (Responses Stream): ${toolName}`,
+                formattedResult
+              );
+
+              toolHistory.push({
+                name: toolName,
+                args: toolArgs,
+                result: formattedResult,
+              });
+
+              input.push({
+                type: "function_call_output",
+                call_id: functionCall.call_id,
+                output: formattedResult,
+              });
+            } catch (error) {
+              console.log(
+                `❌ [Dev-Copilot] Tool Error (Responses Stream): ${toolName}`,
+                error.message
+              );
+
+              const errorMessage = `❌ Tool call failed: ${error.message}`;
+              toolHistory.push({
+                name: toolName,
+                args: toolArgs,
+                result: `Error: ${error.message}`,
+              });
+
+              if (streamCallback) {
+                streamCallback({
+                  type: "error",
+                  content: errorMessage,
+                });
+              }
+
+              input.push({
+                type: "function_call_output",
+                call_id: functionCall.call_id,
+                output: `Error: ${error.message}`,
+              });
+            }
+          }
+
+          continue;
+        }
+
+        if (!currentRoundText) {
+          const fallbackText = node.getResponsesText(lastResponse);
+          if (fallbackText) {
+            accumulatedContent += fallbackText;
+
+            if (streamCallback) {
+              streamCallback({
+                type: "content",
+                content: fallbackText,
+              });
+            }
+          }
+        }
+
+        break;
+      }
+
+      if (round >= maxRounds) {
+        const limitMessage = `⚠️ Reached maximum tool calls (${maxRounds}), response may be incomplete`;
+
+        if (streamCallback) {
+          streamCallback({
+            type: "warning",
+            content: limitMessage,
+          });
+        }
+      }
+
+      if (streamCallback) {
+        streamCallback({
+          type: "end",
+        });
+      }
+
+      return {
+        content: accumulatedContent,
+        usage: lastResponse ? lastResponse.usage : null,
+        toolHistory: toolHistory,
       };
     };
 
