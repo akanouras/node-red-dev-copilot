@@ -1754,6 +1754,48 @@ module.exports = function (RED) {
     };
   };
 
+  const CONTEXT_KEYS = {
+    serviceHistory: "dev-copilot-service-history",
+    selectedServiceNode: "dev-copilot-selected-service-node",
+  };
+
+  const ALLOWED_CONTEXT_KEYS = {
+    read: new Set([
+      CONTEXT_KEYS.serviceHistory,
+      CONTEXT_KEYS.selectedServiceNode,
+    ]),
+    write: new Set([
+      CONTEXT_KEYS.serviceHistory,
+      CONTEXT_KEYS.selectedServiceNode,
+    ]),
+    delete: new Set([CONTEXT_KEYS.serviceHistory]),
+  };
+
+  const validateContextKey = function (key, operation) {
+    if (!key) {
+      return "Key is required";
+    }
+
+    if (!ALLOWED_CONTEXT_KEYS[operation].has(key)) {
+      return "Context key is not allowed";
+    }
+
+    return null;
+  };
+
+  const getContextAccessNode = function () {
+    let contextAccessNode = null;
+    RED.nodes.eachNode(function (configNode) {
+      if (configNode.type === "dev-copilot" && !contextAccessNode) {
+        const runtimeNode = RED.nodes.getNode(configNode.id);
+        if (runtimeNode) {
+          contextAccessNode = runtimeNode;
+        }
+      }
+    });
+    return contextAccessNode;
+  };
+
   // Inject API prefix configuration into client-side via custom endpoint
   RED.httpAdmin.get("/dev-copilot-config.js", function (req, res) {
     const effectivePrefix = `${req.baseUrl || ""}${API_PREFIX}`;
@@ -2174,27 +2216,19 @@ module.exports = function (RED) {
   });
 
   // API endpoint: set context data
-  RED.httpAdmin.post(`${API_PREFIX}/context/set`, function (req, res) {
+  RED.httpAdmin.post(`${API_PREFIX}/context/set`, needsPermission("context.write"), function (req, res) {
     try {
       const { key, data } = req.body;
 
-      if (!key) {
+      const keyError = validateContextKey(key, "write");
+      if (keyError) {
         return res.status(400).json({
           success: false,
-          error: "Key is required",
+          error: keyError,
         });
       }
 
-      // Find any dev-copilot node instance to access global context
-      let contextAccessNode = null;
-      RED.nodes.eachNode(function (configNode) {
-        if (configNode.type === "dev-copilot" && !contextAccessNode) {
-          const runtimeNode = RED.nodes.getNode(configNode.id);
-          if (runtimeNode) {
-            contextAccessNode = runtimeNode;
-          }
-        }
-      });
+      const contextAccessNode = getContextAccessNode();
 
       if (!contextAccessNode) {
         return res.status(500).json({
