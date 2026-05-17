@@ -11,6 +11,20 @@
       }
 
       .dev-copilot-container {
+        --dev-copilot-accent: var(--red-ui-workspace-button-background-primary, #ad1625);
+        --dev-copilot-accent-hover: var(--red-ui-workspace-button-background-primary-hover, #6e0a1e);
+        --dev-copilot-accent-text: var(--red-ui-workspace-button-color-primary, #eee);
+        --dev-copilot-panel-background: var(--red-ui-primary-background, #f3f3f3);
+        --dev-copilot-card-background: var(--red-ui-secondary-background, #fff);
+        --dev-copilot-card-background-hover: var(--red-ui-secondary-background-hover, #e6e6e6);
+        --dev-copilot-text: var(--red-ui-primary-text-color, #555);
+        --dev-copilot-text-muted: var(--red-ui-secondary-text-color, #888);
+        --dev-copilot-border: var(--red-ui-secondary-border-color, #ddd);
+        --dev-copilot-strong-border: var(--red-ui-primary-border-color, #bbb);
+        --dev-copilot-danger: var(--red-ui-border-color-error, #df2935);
+        --dev-copilot-warning: var(--red-ui-border-color-warning, #ffcf70);
+        --dev-copilot-info: var(--red-ui-text-color-link, #08c);
+        --dev-copilot-success: var(--red-ui-text-color-success, #3a3);
         height: 100%;
         display: flex;
         flex-direction: column;
@@ -22,28 +36,76 @@
         left: 0;
         right: 0;
         bottom: 0;
+        background: var(--dev-copilot-card-background);
+        color: var(--dev-copilot-text);
       }
 
       .dev-copilot-header {
-        border-bottom: 1px solid #ddd;
+        border-bottom: 1px solid var(--dev-copilot-border);
         padding-bottom: 6px;
         margin-bottom: 6px;
         flex-shrink: 0;
       }
 
-      .dev-copilot-node-selector {
-        padding: 3px;
-        border: 1px solid #ccc;
-        border-radius: 3px;
+      .dev-copilot-node-controls,
+      .dev-copilot-stream-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .dev-copilot-node-controls {
+        margin-bottom: 6px;
+      }
+
+      .dev-copilot-stream-row {
+        margin-bottom: 4px;
         font-size: 12px;
       }
 
+      .dev-copilot-stream-label {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        cursor: pointer;
+        color: var(--dev-copilot-text-muted);
+      }
 
+      .dev-copilot-stream-status {
+        color: var(--dev-copilot-text-muted);
+        flex: 1;
+        text-align: right;
+      }
+
+      .dev-copilot-stream-status.is-enabled {
+        color: var(--dev-copilot-success);
+      }
+
+      .dev-copilot-stream-label input {
+        margin: 0;
+      }
+
+      .dev-copilot-node-selector {
+        flex: 1;
+        padding: 3px;
+        border: 1px solid var(--red-ui-form-input-border-color, var(--dev-copilot-border));
+        border-radius: 3px;
+        margin-bottom: 0;
+        font-size: 12px;
+        background: var(--red-ui-form-input-background, var(--dev-copilot-card-background));
+        color: var(--red-ui-form-text-color, var(--dev-copilot-text));
+      }
+
+      .dev-copilot-node-selector:focus,
+      .dev-copilot-input:focus {
+        border-color: var(--red-ui-form-input-border-selected-color, var(--dev-copilot-strong-border));
+        outline: 1px solid var(--red-ui-form-input-focus-color, rgba(85, 150, 230, 0.8));
+      }
 
       /* Clear button styles */
       .dev-copilot-clear-btn {
-        background: #dc3545;
-        color: white;
+        background: var(--dev-copilot-danger);
+        color: var(--dev-copilot-accent-text);
         border: none;
         padding: 4px 8px;
         border-radius: 3px;
@@ -53,20 +115,22 @@
       }
 
       .dev-copilot-clear-btn:hover {
-        background: #c82333;
+        background: var(--dev-copilot-accent-hover);
       }
 
       .dev-copilot-messages {
         flex: 1;
         overflow-y: auto;
         overflow-x: hidden;
-        border: 1px solid #ddd;
+        border: 1px solid var(--dev-copilot-border);
         border-radius: 3px;
         padding: 8px;
         margin-bottom: 6px;
-        background: #fafafa;
+        background: var(--dev-copilot-panel-background);
+        color: var(--dev-copilot-text);
         scroll-behavior: smooth;
         min-height: 0;
+        scrollbar-color: var(--dev-copilot-strong-border) var(--dev-copilot-panel-background);
       }
 
       .dev-copilot-messages::after {
@@ -81,17 +145,17 @@
       }
 
       .dev-copilot-messages::-webkit-scrollbar-track {
-        background: #f1f1f1;
+        background: var(--dev-copilot-panel-background);
         border-radius: 4px;
       }
 
       .dev-copilot-messages::-webkit-scrollbar-thumb {
-        background: #c1c1c1;
+        background: var(--dev-copilot-strong-border);
         border-radius: 4px;
       }
 
       .dev-copilot-messages::-webkit-scrollbar-thumb:hover {
-        background: #a8a8a8;
+        background: var(--dev-copilot-text-muted);
       }
 
 
@@ -113,7 +177,7 @@
       .dev-copilot-input {
         flex: 1;
         padding: 6px 8px;
-        border: 1px solid #ccc;
+        border: 1px solid var(--red-ui-form-input-border-color, var(--dev-copilot-border));
         border-radius: 3px;
         resize: none;
         min-height: 32px;
@@ -121,11 +185,17 @@
         font-family: inherit;
         font-size: 13px;
         overflow-y: auto;
+        background: var(--red-ui-form-input-background, var(--dev-copilot-card-background));
+        color: var(--red-ui-form-text-color, var(--dev-copilot-text));
+      }
+
+      .dev-copilot-input::placeholder {
+        color: var(--red-ui-form-placeholder-color, var(--dev-copilot-text-muted));
       }
 
       .dev-copilot-send {
-        background: #28a745;
-        color: white;
+        background: var(--dev-copilot-accent);
+        color: var(--dev-copilot-accent-text);
         border: none;
         padding: 6px 12px;
         border-radius: 3px;
@@ -142,24 +212,25 @@
       }
 
       .dev-copilot-send:hover {
-        background: #218838;
+        background: var(--dev-copilot-accent-hover);
         transform: translateY(-1px);
       }
 
       .dev-copilot-send:disabled {
-        background: #6c757d;
+        background: var(--red-ui-form-button-background, var(--dev-copilot-card-background-hover));
+        color: var(--red-ui-secondary-text-color-disabled, var(--dev-copilot-text-muted));
         cursor: not-allowed;
         transform: none;
       }
 
       /* Status-aware send button states */
       .dev-copilot-send.generating {
-        background: #dc3545;
+        background: var(--dev-copilot-danger);
         cursor: pointer;
       }
 
       .dev-copilot-send.generating:hover {
-        background: #c82333;
+        background: var(--dev-copilot-accent-hover);
         transform: translateY(-1px);
       }
 
@@ -208,37 +279,37 @@
 
       /* User message styles */
       .dev-copilot-message.user {
-        background: linear-gradient(135deg, #007bff, #0056b3);
-        color: white;
+        background: var(--dev-copilot-accent);
+        color: var(--dev-copilot-accent-text);
         margin-left: auto;
         margin-right: 0;
         text-align: left;
         float: right;
-        box-shadow: 0 3px 12px rgba(0, 123, 255, 0.3);
+        box-shadow: 0 2px 8px var(--red-ui-shadow, rgba(0, 0, 0, 0.2));
         border-bottom-right-radius: 4px;
       }
 
       /* Assistant message styles */
       .dev-copilot-message.assistant {
-        background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-        color: #333;
+        background: var(--dev-copilot-card-background);
+        color: var(--dev-copilot-text);
         margin-right: auto;
         margin-left: 0;
         float: left;
-        box-shadow: 0 3px 12px rgba(0, 0, 0, 0.1);
-        border: 1px solid #dee2e6;
+        box-shadow: 0 2px 8px var(--red-ui-shadow, rgba(0, 0, 0, 0.2));
+        border: 1px solid var(--dev-copilot-border);
         border-bottom-left-radius: 4px;
       }
 
       /* Streaming message styles (same as assistant) */
       .dev-copilot-message.streaming {
-        background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-        color: #333;
+        background: var(--dev-copilot-card-background);
+        color: var(--dev-copilot-text);
         margin-right: auto;
         margin-left: 0;
         float: left;
-        box-shadow: 0 3px 12px rgba(0, 0, 0, 0.1);
-        border: 1px solid #dee2e6;
+        box-shadow: 0 2px 8px var(--red-ui-shadow, rgba(0, 0, 0, 0.2));
+        border: 1px solid var(--dev-copilot-border);
         border-bottom-left-radius: 4px;
         position: relative;
       }
@@ -249,51 +320,48 @@
         position: absolute;
         bottom: 8px;
         right: 10px;
-        color: #28a745;
+        color: var(--dev-copilot-success);
         animation: pulse 1.5s ease-in-out infinite;
         font-size: 8px;
       }
 
       /* Error message styles */
       .dev-copilot-message.error {
-        background: linear-gradient(135deg, #f8d7da, #f5c6cb);
-        color: #721c24;
-        border: 1px solid #f5c6cb;
+        background: var(--dev-copilot-card-background);
+        color: var(--red-ui-text-color-error, #ad1625);
+        border: 1px solid var(--dev-copilot-danger);
         margin-right: auto;
         margin-left: 0;
         float: left;
-        box-shadow: 0 3px 12px rgba(220, 53, 69, 0.2);
+        box-shadow: 0 2px 8px var(--red-ui-shadow, rgba(0, 0, 0, 0.2));
       }
 
       /* Info message styles */
       .dev-copilot-message.info {
-        background: linear-gradient(135deg, #e3f2fd, #bbdefb);
-        border-left: 4px solid #2196f3;
-        color: #0d47a1;
+        background: var(--dev-copilot-card-background);
+        border-left: 4px solid var(--dev-copilot-info);
+        color: var(--dev-copilot-text);
         margin: 12px 0;
         float: none;
         clear: both;
         max-width: 100%;
-        box-shadow: 0 3px 12px rgba(33, 150, 243, 0.2);
+        box-shadow: 0 2px 8px var(--red-ui-shadow, rgba(0, 0, 0, 0.2));
       }
 
       /* Warning message styles */
       .dev-copilot-message.warning {
-        background: linear-gradient(135deg, #fff3e0, #ffe0b2);
-        border-left: 4px solid #ff9800;
-        color: #e65100;
+        background: var(--dev-copilot-card-background);
+        border-left: 4px solid var(--dev-copilot-warning);
+        color: var(--dev-copilot-text);
         margin: 12px 0;
         float: none;
         clear: both;
         max-width: 100%;
-        box-shadow: 0 3px 12px rgba(255, 152, 0, 0.2);
+        box-shadow: 0 2px 8px var(--red-ui-shadow, rgba(0, 0, 0, 0.2));
       }
 
-
-
-      /* Tool call indicator styling */
-      .dev-copilot-message:has-text("🔧 Calling tool") {
-        border-left: 3px solid #17a2b8;
+      .dev-copilot-message.tool-call {
+        border-left: 3px solid var(--dev-copilot-info);
       }
 
       /* Loading animation improvement */
@@ -311,7 +379,7 @@
       }
       .dev-copilot-empty-state {
         text-align: center;
-        color: #666;
+        color: var(--dev-copilot-text-muted);
         font-style: italic;
         padding: 20px 10px;
         margin-top: 20px;
@@ -320,13 +388,13 @@
       .dev-copilot-title {
         font-weight: bold;
         margin-bottom: 6px;
-        color: #333;
+        color: var(--dev-copilot-text);
         font-size: 14px;
       }
 
       .dev-copilot-shortcuts {
         font-size: 11px;
-        color: #666;
+        color: var(--dev-copilot-text-muted);
         margin-top: 4px;
         margin-bottom: 0;
         padding-bottom: 4px;
@@ -342,8 +410,8 @@
         <div class="dev-copilot-title">AI Development Copilot</div>
 
         <!-- Node selector and controls -->
-        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
-          <select id="dev-copilot-node-select" class="dev-copilot-node-selector" style="flex: 1; margin-bottom: 0;">
+        <div class="dev-copilot-node-controls">
+          <select id="dev-copilot-node-select" class="dev-copilot-node-selector">
             <option value=""> nodes...</option>
           </select>
           <button id="dev-copilot-clear" class="dev-copilot-clear-btn" title="Clear all global chat history (shared across all nodes)">
@@ -352,12 +420,12 @@
         </div>
         
         <!-- Stream mode toggle -->
-        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px; font-size: 12px;">
-          <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; color: #666;">
-            <input type="checkbox" id="dev-copilot-stream-toggle" checked style="margin: 0;">
+        <div class="dev-copilot-stream-row">
+          <label class="dev-copilot-stream-label">
+            <input type="checkbox" id="dev-copilot-stream-toggle" checked>
             <span>Stream mode</span>
           </label>
-          <small style="color: #999; flex: 1; text-align: right;" id="stream-status">Real-time streaming enabled</small>
+          <small class="dev-copilot-stream-status is-enabled" id="stream-status">Real-time streaming enabled</small>
         </div>
 
       </div>

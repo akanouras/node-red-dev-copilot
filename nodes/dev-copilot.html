@@ -1011,6 +1011,9 @@
         const messageClasses = ["dev-copilot-message", type];
         if (isLoading) messageClasses.push("loading");
         if (isStreaming) messageClasses.push("streaming");
+        if (content && /(?:🔧|❌)\s+(?:Calling tool|\[Dev-Copilot\] Tool Error)/.test(content)) {
+          messageClasses.push("tool-call");
+        }
 
         const messageDiv = $(`<div class="${messageClasses.join(" ")}"></div>`);
 
@@ -1028,6 +1031,10 @@
       function updateMessageContent(messageElement, content) {
         if (messageElement) {
           messageElement.text(content);
+          messageElement.toggleClass(
+            "tool-call",
+            !!content && /(?:🔧|❌)\s+(?:Calling tool|\[Dev-Copilot\] Tool Error)/.test(content)
+          );
           messageContainer.scrollTop(messageContainer[0].scrollHeight);
         }
       }
@@ -1306,10 +1313,10 @@ Unable to load available nodes. Please check:
         const isEnabled = $(this).is(":checked");
         if (isEnabled) {
           streamStatus.text("Real-time streaming enabled");
-          streamStatus.css("color", "#28a745");
+          streamStatus.addClass("is-enabled");
         } else {
           streamStatus.text("Traditional mode enabled");
-          streamStatus.css("color", "#6c757d");
+          streamStatus.removeClass("is-enabled");
         }
       });
 
