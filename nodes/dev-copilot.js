@@ -1744,6 +1744,16 @@ module.exports = function (RED) {
     },
   });
 
+  const needsPermission = function (permission) {
+    if (RED.auth && typeof RED.auth.needsPermission === "function") {
+      return RED.auth.needsPermission(permission);
+    }
+
+    return function (req, res, next) {
+      next();
+    };
+  };
+
   // Inject API prefix configuration into client-side via custom endpoint
   RED.httpAdmin.get("/dev-copilot-config.js", function (req, res) {
     const effectivePrefix = `${req.baseUrl || ""}${API_PREFIX}`;
@@ -1780,7 +1790,7 @@ module.exports = function (RED) {
   });
 
   // API endpoint: send message to copilot
-  RED.httpAdmin.post(`${API_PREFIX}/chat`, async function (req, res) {
+  RED.httpAdmin.post(`${API_PREFIX}/chat`, needsPermission("flows.write"), async function (req, res) {
     try {
       const { message, nodeId } = req.body;
 
