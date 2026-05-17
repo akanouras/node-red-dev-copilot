@@ -2272,27 +2272,19 @@ module.exports = function (RED) {
   });
 
   // API endpoint: delete context data
-  RED.httpAdmin.post(`${API_PREFIX}/context/delete`, function (req, res) {
+  RED.httpAdmin.post(`${API_PREFIX}/context/delete`, needsPermission("context.write"), function (req, res) {
     try {
       const { key } = req.body;
 
-      if (!key) {
+      const keyError = validateContextKey(key, "delete");
+      if (keyError) {
         return res.status(400).json({
           success: false,
-          error: "Key is required",
+          error: keyError,
         });
       }
 
-      // Find any dev-copilot node instance to access global context
-      let contextAccessNode = null;
-      RED.nodes.eachNode(function (configNode) {
-        if (configNode.type === "dev-copilot" && !contextAccessNode) {
-          const runtimeNode = RED.nodes.getNode(configNode.id);
-          if (runtimeNode) {
-            contextAccessNode = runtimeNode;
-          }
-        }
-      });
+      const contextAccessNode = getContextAccessNode();
 
       if (!contextAccessNode) {
         return res.status(500).json({
