@@ -364,6 +364,83 @@
         border-left: 3px solid var(--dev-copilot-info);
       }
 
+      .dev-copilot-message.markdown-rendered {
+        white-space: normal;
+      }
+
+      .dev-copilot-message p,
+      .dev-copilot-message ul,
+      .dev-copilot-message ol,
+      .dev-copilot-message blockquote,
+      .dev-copilot-message pre,
+      .dev-copilot-message table {
+        margin-top: 0;
+        margin-bottom: 8px;
+      }
+
+      .dev-copilot-message p:last-child,
+      .dev-copilot-message ul:last-child,
+      .dev-copilot-message ol:last-child,
+      .dev-copilot-message blockquote:last-child,
+      .dev-copilot-message pre:last-child,
+      .dev-copilot-message table:last-child {
+        margin-bottom: 0;
+      }
+
+      .dev-copilot-message ul,
+      .dev-copilot-message ol {
+        padding-left: 20px;
+      }
+
+      .dev-copilot-message blockquote {
+        border-left: 3px solid var(--dev-copilot-border);
+        color: var(--dev-copilot-text-muted);
+        padding-left: 10px;
+      }
+
+      .dev-copilot-message pre {
+        background: var(--red-ui-tertiary-background, #f7f7f7);
+        border: 1px solid var(--dev-copilot-border);
+        border-radius: 4px;
+        overflow-x: auto;
+        padding: 8px;
+        white-space: pre;
+      }
+
+      .dev-copilot-message code {
+        background: var(--red-ui-tertiary-background, #f7f7f7);
+        border: 1px solid var(--dev-copilot-border);
+        border-radius: 3px;
+        font-family: Menlo, Consolas, Monaco, monospace;
+        font-size: 12px;
+        padding: 1px 3px;
+      }
+
+      .dev-copilot-message pre code {
+        background: transparent;
+        border: 0;
+        padding: 0;
+        white-space: inherit;
+      }
+
+      .dev-copilot-message table {
+        border-collapse: collapse;
+        display: block;
+        max-width: 100%;
+        overflow-x: auto;
+      }
+
+      .dev-copilot-message th,
+      .dev-copilot-message td {
+        border: 1px solid var(--dev-copilot-border);
+        padding: 4px 6px;
+        text-align: left;
+      }
+
+      .dev-copilot-message a {
+        color: var(--dev-copilot-info);
+      }
+
       /* Loading animation improvement */
       .dev-copilot-message.loading {
         animation: pulse 1.5s ease-in-out infinite;
@@ -463,6 +540,8 @@
       </div>
 
 
+    <script src="{{API_PREFIX}}/vendor/marked.umd.js"></script>
+    <script src="{{API_PREFIX}}/vendor/purify.min.js"></script>
     <script>
       // Inject API prefix configuration
       window.NODE_HTTP_API_PREFIX = '{{API_PREFIX}}';

@@ -2233,6 +2233,56 @@ module.exports = function (RED) {
     delete: new Set([CONTEXT_KEYS.serviceHistory]),
   };
 
+  const sendVendorScript = function (res, packageName, relativePath) {
+    const fs = require("fs");
+    let scriptPath;
+
+    try {
+      let packageRoot;
+
+      try {
+        packageRoot = path.dirname(require.resolve(`${packageName}/package.json`));
+      } catch (packageJsonError) {
+        let currentDir = path.dirname(require.resolve(packageName));
+
+        while (currentDir !== path.dirname(currentDir)) {
+          const packageJsonPath = path.join(currentDir, "package.json");
+          if (fs.existsSync(packageJsonPath)) {
+            packageRoot = currentDir;
+            break;
+          }
+          currentDir = path.dirname(currentDir);
+        }
+      }
+
+      if (!packageRoot) {
+        throw new Error("Unable to resolve package root");
+      }
+
+      scriptPath = path.join(packageRoot, relativePath);
+    } catch (error) {
+      RED.log.error(
+        `Dev Copilot vendor package not found: ${packageName} (${error.message})`
+      );
+      res.status(500).send("Vendor package not available");
+      return;
+    }
+
+    fs.readFile(scriptPath, "utf8", function (error, content) {
+      if (error) {
+        RED.log.error(
+          `Dev Copilot vendor script not found: ${scriptPath} (${error.message})`
+        );
+        res.status(404).send("Vendor script not found");
+        return;
+      }
+
+      res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+      res.setHeader("Cache-Control", "public, max-age=86400");
+      res.send(content);
+    });
+  };
+
   const validateContextKey = function (key, operation) {
     if (!key) {
       return "Key is required";
@@ -2271,6 +2321,14 @@ module.exports = function (RED) {
     res.send(configScript);
   });
 
+  RED.httpAdmin.get(`${API_PREFIX}/vendor/marked.umd.js`, function (req, res) {
+    sendVendorScript(res, "marked", "lib/marked.umd.js");
+  });
+
+  RED.httpAdmin.get(`${API_PREFIX}/vendor/purify.min.js`, function (req, res) {
+    sendVendorScript(res, "dompurify", "dist/purify.min.js");
+  });
+
   // Register sidebar
   RED.httpAdmin.get(`${API_PREFIX}/sidebar`, function (req, res) {
     const fs = require("fs");
@@ -2283,7 +2341,7 @@ module.exports = function (RED) {
 
       // Inject API prefix variable including admin base
       const effectivePrefix = `${req.baseUrl || ""}${API_PREFIX}`;
-      htmlContent = htmlContent.replace("{{API_PREFIX}}", effectivePrefix);
+      htmlContent = htmlContent.replace(/{{API_PREFIX}}/g, effectivePrefix);
 
       res.setHeader("Content-Type", "text/html");
       res.send(htmlContent);

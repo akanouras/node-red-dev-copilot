@@ -504,7 +504,9 @@
       $.get(`${apiPrefix}/sidebar`)
         .done(function (data) {
           content.html(data);
-          initializeSidebarFunctionality();
+          loadMarkdownLibraries(apiPrefix).always(function () {
+            initializeSidebarFunctionality();
+          });
         })
         .fail(function (xhr, status, error) {
           console.error("Failed to load Dev Copilot sidebar:", {
@@ -527,6 +529,40 @@
               "</p><p>Check browser console for more details.</p></div>"
           );
         });
+    }
+
+    function loadMarkdownLibraries(apiPrefix) {
+      const loaders = [];
+
+      if (!window.marked) {
+        loaders.push(
+          $.ajax({
+            url: `${apiPrefix}/vendor/marked.umd.js`,
+            dataType: "script",
+            cache: true,
+          })
+        );
+      }
+
+      if (!window.DOMPurify) {
+        loaders.push(
+          $.ajax({
+            url: `${apiPrefix}/vendor/purify.min.js`,
+            dataType: "script",
+            cache: true,
+          })
+        );
+      }
+
+      if (loaders.length === 0) {
+        return $.Deferred().resolve().promise();
+      }
+
+      return $.when.apply($, loaders).fail(function () {
+        console.warn(
+          "Dev Copilot: Markdown libraries failed to load; falling back to plain text rendering."
+        );
+      });
     }
 
     function loadSidebarContent() {
@@ -1018,6 +1054,112 @@
 
       // Send button state management
       let currentAbortController = null;
+      const renderMarkdownMessageTypes = new Set([
+        "assistant",
+        "info",
+        "warning",
+        "error",
+      ]);
+      const allowedUrlProtocolPattern = /^(https?:|mailto:|tel:)/i;
+      const urlProtocolPattern = /^[a-z][a-z0-9+.-]*:/i;
+
+      function canRenderMarkdown(type) {
+        return renderMarkdownMessageTypes.has(type);
+      }
+
+      function sanitizeMarkdownHtml(html) {
+        return DOMPurify.sanitize(html, {
+          ALLOWED_TAGS: [
+            "a",
+            "blockquote",
+            "br",
+            "code",
+            "del",
+            "em",
+            "h1",
+            "h2",
+            "h3",
+            "h4",
+            "h5",
+            "h6",
+            "hr",
+            "li",
+            "ol",
+            "p",
+            "pre",
+            "strong",
+            "table",
+            "tbody",
+            "td",
+            "th",
+            "thead",
+            "tr",
+            "ul",
+          ],
+          ALLOWED_ATTR: ["href", "title"],
+          ALLOW_DATA_ATTR: false,
+        });
+      }
+
+      function hardenRenderedLinks(messageElement) {
+        messageElement.find("a").each(function () {
+          const link = $(this);
+          const href = (link.attr("href") || "").trim();
+
+          if (
+            !href ||
+            (urlProtocolPattern.test(href) &&
+              !allowedUrlProtocolPattern.test(href))
+          ) {
+            link.removeAttr("href");
+            return;
+          }
+
+          link.attr("target", "_blank");
+          link.attr("rel", "noopener noreferrer");
+        });
+      }
+
+      function renderMessageContent(messageElement, type, content) {
+        const rawContent = content == null ? "" : String(content);
+        messageElement.removeClass("markdown-rendered");
+
+        if (!canRenderMarkdown(type)) {
+          messageElement.text(rawContent);
+          return;
+        }
+
+        if (
+          !window.marked ||
+          !window.DOMPurify ||
+          typeof DOMPurify.sanitize !== "function"
+        ) {
+          messageElement.text(rawContent);
+          return;
+        }
+
+        try {
+          if (typeof marked.setOptions === "function") {
+            marked.setOptions({
+              breaks: true,
+              gfm: true,
+              headerIds: false,
+              mangle: false,
+            });
+          }
+
+          const parseMarkdown = marked.parse || marked;
+          const html = parseMarkdown(rawContent);
+          const sanitizedHtml = sanitizeMarkdownHtml(html);
+
+          messageElement.html(sanitizedHtml);
+          messageElement.addClass("markdown-rendered");
+          hardenRenderedLinks(messageElement);
+        } catch (error) {
+          console.warn("Dev Copilot: Markdown rendering failed:", error);
+          messageElement.text(rawContent);
+        }
+      }
 
       function setSendButtonState(state) {
         const sendButton = $("#dev-copilot-send");
@@ -1068,8 +1210,7 @@
 
         const messageDiv = $(`<div class="${messageClasses.join(" ")}"></div>`);
 
-        // Set content
-        messageDiv.text(content);
+        renderMessageContent(messageDiv, type, content);
 
         // Append and scroll
         messageContainer.append(messageDiv);
@@ -1081,7 +1222,17 @@
       // Update message content (for streaming)
       function updateMessageContent(messageElement, content) {
         if (messageElement) {
-          messageElement.text(content);
+          const type = messageElement.hasClass("assistant")
+            ? "assistant"
+            : messageElement.hasClass("info")
+            ? "info"
+            : messageElement.hasClass("warning")
+            ? "warning"
+            : messageElement.hasClass("error")
+            ? "error"
+            : "user";
+
+          renderMessageContent(messageElement, type, content);
           messageElement.toggleClass(
             "tool-call",
             !!content && /(?:🔧|❌)\s+(?:Calling tool|\[Dev-Copilot\] Tool Error)/.test(content)
